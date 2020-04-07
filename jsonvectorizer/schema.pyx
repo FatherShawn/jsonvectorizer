@@ -1,5 +1,7 @@
 cimport cython
+cimport numpy as np
 
+import numpy as np
 import re
 import sys
 
@@ -8,6 +10,15 @@ from .jsontype cimport *
 
 # Python version (for handling unicode strings)
 cdef int VERSION = sys.version_info.major
+
+
+cdef int hasmatch(str s, str[:] patterns) except -1:
+    # Determine whether a string matches any of the given regex patterns
+    for pattern in patterns:
+        if re.search(pattern, s):
+            return 1
+
+    return 0
 
 
 cdef class Schema:
@@ -175,8 +186,7 @@ cdef class Schema:
 
         Parameters
         ----------
-        patterns : list of str
-            List of regular expression patterns for finding nodes.
+        patterns : str or list of str
 
         Returns
         -------
@@ -186,11 +196,13 @@ cdef class Schema:
             root) to a matching node.
 
         """
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        patterns = np.asarray(patterns, dtype=object)
+
         paths = []
-        for pattern in patterns:
-            if re.search(pattern, ':'.join(self.path)):
-                paths.append(self.path)
-                break
+        if hasmatch(':'.join(self.path), patterns):
+            paths.append(self.path)
 
         for name in sorted(self.properties):
             property_ = self.get_property(name)

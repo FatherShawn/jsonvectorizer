@@ -8,7 +8,7 @@ import scipy.sparse as sp
 
 from .jsontype cimport *
 from .lil cimport *
-from .schema cimport Schema
+from .schema cimport *
 
 
 cdef tuple get_vectorizer(dict[:] vectorizers, JsonType json_type, str path):
@@ -21,21 +21,13 @@ cdef tuple get_vectorizer(dict[:] vectorizers, JsonType json_type, str path):
             else:
                 if type2str(json_type) not in d['type']:
                     continue
-        if 'pattern' in d and not re.search(d['pattern'], path):
-            continue
+        if 'patterns' in d:
+            if not hasmatch(path, d['patterns']):
+                continue
 
         return d['vectorizer'], d.get('args', []), d.get('kwargs', {})
 
     return None
-
-
-cdef int hasmatch(str s, str[:] patterns) except -1:
-    # Determine whether a string matches any of the given regex patterns
-    for pattern in patterns:
-        if re.search(pattern, s):
-            return 1
-
-    return 0
 
 
 cdef class JsonVectorizer(Schema):
@@ -387,10 +379,10 @@ cdef class JsonVectorizer(Schema):
 
         Parameters
         ----------
-        patterns : list of str (default=[])
-            List containing regular expressions. Node paths that match
-            any of these patterns will be dropped. Node names in a path
-            are separated by colons, e.g., 'foo:bar'.
+        patterns : str or list of str (default=[])
+            Drops node paths that match this (at least one of these)
+            regular expression(s). Node names in a path are separated by
+            colons, e.g., 'foo:bar'.
         min_f : int or float, optional (default=1)
             For all nodes in the learned schema, removes data types with
             less than this many collected samples. An integer is taken
@@ -406,7 +398,10 @@ cdef class JsonVectorizer(Schema):
             type is removed.
 
         """
+        if isinstance(patterns, str):
+            patterns = [patterns]
         patterns = np.asarray(patterns, dtype=object)
+
         if isinstance(min_f, float):
             min_f = int(min_f * sum(self.counts.values()))
 
@@ -425,8 +420,9 @@ cdef class JsonVectorizer(Schema):
           can be used with `vectorizer`. If not provided, matches all
           supported data types: {'object', 'array', 'null', 'boolean',
           'integer', 'number', 'string'}.
-        * **pattern** (str, optional) : When provided, nodes that do not
-          match this regular expression will be ignored.
+        * **patterns** (str or list of str, optional) : When provided,
+          nodes that do not match this (at least one of these) regular
+          expression(s) will be skipped over.
         * **args** (list, optional) : Positional arguments passed to
           `vectorizer` for initialization.
         * **kwargs** (dict, optional) : Keyword arguments passed to
@@ -441,23 +437,35 @@ cdef class JsonVectorizer(Schema):
         vectorizers : list of dict, optional (default=[])
             List of vectorizer definitions (see above for details) for
             extracting features from individual nodes.
-        ignore_patterns : list of str, optional (default=[])
-            List containing regular expressions. Node paths that match
-            any of these patterns will be ignored. Node names in a path
-            are separated by colons, e.g., 'foo:bar'.
+        ignore_patterns : str or list of str, optional (default=[])
+            Node paths that match this (at least one of these) regular
+            expression(s) will be ignored. Node names in a path are
+            separated by colons, e.g., 'foo:bar'.
 
         Returns
         -------
         self
 
         """
-        for doc in docs:
-            self._extend(doc)
+        vectorizers = copy.deepcopy(vectorizers)
+        for vectorizer in vectorizers:
+            if 'patterns' in vectorizer:
+                patterns = vectorizer['patterns']
+                if isinstance(patterns, str):
+                    patterns = [patterns]
+
+                vectorizer['patterns'] = np.asarray(patterns, dtype=object)
+
+        if isinstance(ignore_patterns, str):
+            ignore_patterns = [ignore_patterns]
 
         vectorizers = np.asarray(vectorizers, dtype=object)
         ignore_patterns = np.asarray(ignore_patterns, dtype=object)
-        self._fit(0, sum(self.counts.values()), vectorizers, ignore_patterns)
 
+        for doc in docs:
+            self._extend(doc)
+
+        self._fit(0, sum(self.counts.values()), vectorizers, ignore_patterns)
         return self
 
     def transform(self, docs):

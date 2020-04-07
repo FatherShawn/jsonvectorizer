@@ -1,5 +1,7 @@
 from .jsontype cimport *
 
+cdef int hasmatch(str s, str[:] patterns) except -1
+
 cdef class Schema:
     cdef readonly:
         tuple path
