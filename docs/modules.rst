@@ -30,6 +30,7 @@ Vectorizers
     vectorizers.BaseVectorizer
     vectorizers.BoolVectorizer
     vectorizers.NumberVectorizer
+    vectorizers.OneHotVectorizer
     vectorizers.StringVectorizer
     vectorizers.TimestampVectorizer
 
