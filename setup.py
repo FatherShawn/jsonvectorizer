@@ -21,7 +21,7 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name='jsonvectorizer',
-    version='0.1.0',
+    version='0.1.1',
     packages=setuptools.find_packages(),
     ext_modules=cythonize(extensions),
     include_dirs=[np.get_include()],

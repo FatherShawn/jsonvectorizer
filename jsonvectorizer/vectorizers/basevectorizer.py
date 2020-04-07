@@ -9,7 +9,7 @@ class BaseVectorizer(base.BaseEstimator, base.TransformerMixin):
     scikit-learn-like interface, i.e., :meth:`fit` and :meth:`transform`
     methods. The :meth:`fit` method must accept arbitrary keyword
     arguments, i.e., `**kwargs` at the end of the method's signature,
-    and must return None upon failure.
+    and must return None when no features are generated.
 
     """
 
@@ -19,14 +19,12 @@ class BaseVectorizer(base.BaseEstimator, base.TransformerMixin):
         Parameters
         ----------
         values : array-like, [n_samples]
-            Data for fitting/transforming.
         **fit_params
             Keyword arguments, passed to the :meth:`fit` method.
 
         Returns
         -------
         X : ndarray, [n_samples, n_features]
-            Feature matrix.
 
         """
         return base.TransformerMixin.fit_transform(self, values, **fit_params)

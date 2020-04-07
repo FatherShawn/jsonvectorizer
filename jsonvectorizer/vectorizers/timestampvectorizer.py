@@ -23,19 +23,27 @@ def parse_timestamp(timestamp):
 class TimestampVectorizer(BaseVectorizer):
     """Vectorizer for timestamps
 
-    Parses and converts strings to unix timestamps, bins results into
-    equiprobable bins, and uses one-hot encoding to create a binary
+    Bins data into the specfied number of equiprobable bins, or using
+    the provded bin edges, and uses one-hot encoding to create a binary
     feature matrix. After binning, the resulting bins are processed from
     left to right, and are merged into their right neighbor until all
     bins contain at least the specified number of items. If necessary,
-    the right-most bin is then merged into its left neighbor. Also, if
-    at least `min_f` items are not valid timestamps, an additional bin
-    (feature) is created for such items.
+
+    Parses and converts strings to unix timestamps, bins results into
+    the specified number of equiprobable bins, or using the provided bin
+    edges. and uses one-hot encoding to create a binary feature matrix.
+    After binning, the resulting bins are processed from left to right,
+    and are merged into their right neighbor until all bins contain at
+    least the specified number of items. If necessary, the right-most
+    bin is then merged into its left neighbor. Also, if at least `min_f`
+    items are not valid timestamps, an additional bin (feature) is
+    created for invalid timestamps.
 
     Parameters
     ----------
-    n_bins : int
-        Number of bins to generate.
+    bins : int or list
+        Number of bins to generate, or a list of timestamps to use as
+        bin edges (excluding -inf and inf).
     min_f : int or float, optional (default=1)
         Minimum number of samples in each generated bin. An integer is
         taken as an absolute count, and a float indicates the proportion
@@ -44,20 +52,20 @@ class TimestampVectorizer(BaseVectorizer):
     Raises
     ------
     ValueError
-        If `n_bins` is not a positive integer, or if `min_f` is not a
-        positive numbers.
+        If `min_f` is not a positive number.
 
     Attributes
     ----------
     feature_names_ : list of str
-        Array mapping from feature integer indices to feature names.
 
     """
 
-    def __init__(self, n_bins, min_f=1):
-        _validation.check_positive_int(n_bins, alias='n_bins')
+    def __init__(self, bins, min_f=1):
         _validation.check_positive(min_f, alias='min_f')
-        self.n_bins = n_bins
+        if not isinstance(bins, int):
+            bins = [parse_timestamp(bin_edge) for bin_edge in bins]
+
+        self.bins = bins
         self.min_f = min_f
 
     def fit(self, values, n_total=None, **kwargs):
@@ -66,7 +74,6 @@ class TimestampVectorizer(BaseVectorizer):
         Parameters
         ----------
         values : array-like, [n_samples]
-            Timestamps for fitting the vectorizer.
         n_total : int or None, optional (default=None)
             Total Number of documents that values are extracted from. If
             None, defaults to ``len(values)``.
@@ -97,9 +104,9 @@ class TimestampVectorizer(BaseVectorizer):
                 n_invalid += 1
 
         has_invalid_feature = (n_invalid >= min_f)
-        vectorizer = NumberVectorizer(self.n_bins, min_f=min_f)
+        vectorizer = NumberVectorizer(self.bins, min_f=min_f)
         vectorizer = vectorizer.fit(timestamps, n_total=n_total)
-        if not has_invalid_feature and vectorizer is None:
+        if vectorizer is None and not has_invalid_feature:
             return None
 
         feature_names = []
@@ -123,24 +130,20 @@ class TimestampVectorizer(BaseVectorizer):
         return self
 
     def transform(self, values):
-        """Transform values to feature matrix
+        """Transform values and return the resulting feature matrix
 
         Parameters
         ----------
         values : array-like, [n_samples]
-            Timestamps for transforming.
 
         Returns
         -------
         X : sparse matrix, [n_samples, n_features]
-            Feature matrix.
 
         Raises
         ------
         NotFittedError
             If the vectorizer has not yet been fitted.
-        ValueError
-            If `values` is not a one-dimensional array.
 
         """
         if not hasattr(self, 'feature_names_'):
