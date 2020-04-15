@@ -19,8 +19,10 @@ class OneHotVectorizer(BaseVectorizer):
     min_categories : int, optional (default=1)
         Does not generate any features if the number of extracted
         categories is lower than this threshold.
-    lowercase : bool, optional(default=True)
+    lowercase : bool, optional (default=True)
         Whether to convert strings to lowercase.
+    dtype : optional (default=np.float_)
+        NumPy compatible data type for feature matrix.
 
     Raises
     ------
@@ -34,13 +36,16 @@ class OneHotVectorizer(BaseVectorizer):
 
     """
 
-    def __init__(self, min_f=1, min_categories=1, lowercase=True):
+    def __init__(
+        self, min_f=1, min_categories=1, lowercase=True, dtype=np.float_
+    ):
         _validation.check_positive(min_f, alias='min_f')
         _validation.check_positive_int(min_categories, alias='min_categories')
 
         self.min_f = min_f
         self.min_categories = min_categories
         self.lowercase = bool(lowercase)
+        self.dtype = np.dtype(dtype)
 
     def fit(self, values, n_total=None, **kwargs):
         """Fit vectorizer to the provided data
@@ -81,7 +86,7 @@ class OneHotVectorizer(BaseVectorizer):
             return None
 
         vectorizer = preprocessing.OneHotEncoder(
-            categories=[categories], dtype=np.bool, handle_unknown='ignore'
+            categories=[categories], dtype=self.dtype, handle_unknown='ignore'
         )
         vectorizer.fit(values)
 

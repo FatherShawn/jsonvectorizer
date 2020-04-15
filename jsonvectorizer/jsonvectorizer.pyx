@@ -246,7 +246,8 @@ cdef class JsonVectorizer(Schema):
                     if vectorizer is not None:
                         self.vectorizers[json_type] = vectorizer
                         self.feature_names.extend([
-                            path + ' ' + fn for fn in vectorizer.feature_names_
+                            path + ' ' + fn if fn else path
+                            for fn in vectorizer.feature_names_
                         ])
             if json_type in self.values:
                 del self.values[json_type]
@@ -284,7 +285,8 @@ cdef class JsonVectorizer(Schema):
             if len(self.type) > 1:
                 if json_type in indices_by_type:
                     indices_ = indices_by_type[json_type]
-                    lil_set_col(X_rows, X_data, indices[indices_], pos)
+                    rs = indices[indices_]
+                    lil_set_col(X_rows, X_data, rs, pos, 1)
 
                 pos += 1
             if json_type == OBJECT:
@@ -292,7 +294,8 @@ cdef class JsonVectorizer(Schema):
                     if name not in self.required:
                         if name in indices_by_property:
                             indices_ = indices_by_property[name]
-                            lil_set_col(X_rows, X_data, indices[indices_], pos)
+                            rs = indices[indices_]
+                            lil_set_col(X_rows, X_data, rs, pos, 1)
 
                         pos += 1
             if json_type in self.vectorizers:
@@ -300,11 +303,23 @@ cdef class JsonVectorizer(Schema):
                 if json_type in indices_by_type:
                     indices_ = indices_by_type[json_type]
                     docs_ = [docs[i] for i in indices_]
-                    rs, cs = vectorizer.transform(docs_).nonzero()
+                    x = vectorizer.transform(docs_)
+
+                    if isinstance(x, sp.spmatrix):
+                        x = x.tocoo()
+                        rs = x.row
+                        cs = x.col
+                        ds = x.data
+                    else:
+                        rs, cs = x.nonzero()
+                        ds = x[rs,cs]
+
                     if cs.dtype != np.int32:
                         cs = cs.astype(np.int32)
 
-                    lil_set(X_rows, X_data, indices[indices_][rs], pos + cs)
+                    rs = indices[indices_][rs]
+                    cs += pos
+                    lil_set(X_rows, X_data, rs, cs, ds)
 
                 if hasattr(vectorizer, 'feature_names_'):
                     pos += len(vectorizer.feature_names_)
@@ -468,17 +483,19 @@ cdef class JsonVectorizer(Schema):
         self._fit(0, sum(self.counts.values()), vectorizers, ignore_patterns)
         return self
 
-    def transform(self, docs):
+    def transform(self, docs, dtype=np.float_):
         """Transform JSON documents to feature matrix.
 
         Parameters
         ----------
-        docs: iterable object
+        docs : iterable object
             Iterable containing JSON documents.
+        dtype : optional (default=np.float_)
+            Numpy compatible data type for feature matrix.
 
         Returns
         -------
-        X: sparse LIL matrix, [n_samples, n_features]
+        X : sparse COO matrix, [n_samples, n_features]
             Feature matrix.
 
         """
@@ -486,8 +503,8 @@ cdef class JsonVectorizer(Schema):
         if not isinstance(docs, list):
             docs = list(docs)
 
-        X = sp.lil_matrix((len(docs), self.n_features), dtype=bool)
+        X = sp.lil_matrix((len(docs), self.n_features), dtype=dtype)
         indices = np.arange(len(docs), dtype=np.int32)
         self._transform(docs, X.rows, X.data, indices)
 
-        return X
+        return X.tocoo()

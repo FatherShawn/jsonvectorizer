@@ -1,4 +1,5 @@
 cimport cython
+cimport numpy as np
 
 
 @cython.cdivision(True)
@@ -26,39 +27,45 @@ cdef inline int bisect_left(list a, int x) except -1:
     return lo
 
 
-cdef int lil_insert(list[:] rows, list[:] datas, int i, int j) except -1:
+cdef int lil_insert(
+    list[:] rows, list[:] datas, int r, int c, object d
+) except -1:
     # Insert a single entry into a binary LIL matrix
     # Simplified version of counterpart in scipy.sparse._csparsetools
     cdef:
-        list row = rows[i]
-        list data = datas[i]
-        int pos = bisect_left(row, j)
+        list row = rows[r]
+        list data = datas[r]
+        int pos = bisect_left(row, c)
 
     if pos == len(row):
-        row.append(j)
-        data.append(True)
-    elif row[pos] != j:
-        row.insert(pos, j)
-        data.insert(pos, True)
+        row.append(c)
+        data.append(d)
+    elif row[pos] != c:
+        row.insert(pos, c)
+        data.insert(pos, d)
     else:
-        data[pos] = True
+        data[pos] += d
 
     return 0
 
 
-cdef int lil_set_col(list[:] rows, list[:] data, int[:] rs, int col) except -1:
+cdef int lil_set_col(
+    list[:] rows, list[:] datas, int[:] rs, int c, object d
+) except -1:
     # Set rows in a given column of a LIL matrix
     cdef int i
     for i in range(rs.shape[0]):
-        lil_insert(rows, data, rs[i], col)
+        lil_insert(rows, datas, rs[i], c, d)
 
     return 0
 
 
-cdef int lil_set(list[:] rows, list[:] data, int[:] rs, int[:] cols) except -1:
+cdef int lil_set(
+    list[:] rows, list[:] datas, int[:] rs, int[:] cs, np.ndarray ds
+) except -1:
     # Set arbitrary entries in a LIL matrix
     cdef int i
     for i in range(rs.shape[0]):
-        lil_insert(rows, data, rs[i], cols[i])
+        lil_insert(rows, datas, rs[i], cs[i], ds[i])
 
     return 0

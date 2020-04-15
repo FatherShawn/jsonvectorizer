@@ -18,6 +18,8 @@ class StringVectorizer(BaseVectorizer):
         frequency strictly lower than this threshold. An integer is
         taken as an absolute count, and a float indicates the proportion
         of `n_total` passed to the :meth:`fit` method.
+    dtype : optional (default=np.float_)
+        NumPy compatible data type for feature matrix.
     **kwargs
         Passed to scikit-learn's :class:`CountVectorizer` class for
         initialization.
@@ -33,8 +35,9 @@ class StringVectorizer(BaseVectorizer):
 
     """
 
-    def __init__(self, min_df=1, **kwargs):
+    def __init__(self, min_df=1, dtype=np.float_, **kwargs):
         _validation.check_positive(min_df, alias='min_df')
+        self.dtype = np.dtype(dtype)
         self.params = dict(min_df=min_df, **kwargs)
 
     def fit(self, values, n_total=None, **kwargs):
@@ -66,7 +69,7 @@ class StringVectorizer(BaseVectorizer):
             params['min_df'] = params['min_df']
 
         vectorizer = feature_extraction.text.CountVectorizer(
-            binary=True, dtype=np.bool, **params
+            dtype=self.type, **params
         )
         try:
             vectorizer.fit(values)

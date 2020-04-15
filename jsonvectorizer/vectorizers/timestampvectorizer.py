@@ -1,10 +1,11 @@
 import datetime
 import dateutil.parser
+import numpy as np
 import pytz
 import scipy.sparse as sp
 
 from .basevectorizer import BaseVectorizer
-from .numbervectorizer import NumberVectorizer
+from .binvectorizer import BinVectorizer
 from ..utils import _validation
 
 
@@ -24,7 +25,7 @@ class TimestampVectorizer(BaseVectorizer):
     """Vectorizer for timestamps
 
     Bins data into the specfied number of equiprobable bins, or using
-    the provded bin edges, and uses one-hot encoding to create a binary
+    the provided bin edges, and uses one-hot encoding to create a binary
     feature matrix. After binning, the resulting bins are processed from
     left to right, and are merged into their right neighbor until all
     bins contain at least the specified number of items. If necessary,
@@ -48,6 +49,8 @@ class TimestampVectorizer(BaseVectorizer):
         Minimum number of samples in each generated bin. An integer is
         taken as an absolute count, and a float indicates the proportion
         of `n_total` passed to the :meth:`fit` method.
+    dtype : optional (default=np.float_)
+        NumPy compatible data type for feature matrix.
 
     Raises
     ------
@@ -60,13 +63,14 @@ class TimestampVectorizer(BaseVectorizer):
 
     """
 
-    def __init__(self, bins, min_f=1):
+    def __init__(self, bins, min_f=1, dtype=np.float_):
         _validation.check_positive(min_f, alias='min_f')
         if not isinstance(bins, int):
             bins = [parse_timestamp(bin_edge) for bin_edge in bins]
 
         self.bins = bins
         self.min_f = min_f
+        self.type = np.dtype(dtype)
 
     def fit(self, values, n_total=None, **kwargs):
         """Fit vectorizer to the provided data
@@ -104,7 +108,7 @@ class TimestampVectorizer(BaseVectorizer):
                 n_invalid += 1
 
         has_invalid_feature = (n_invalid >= min_f)
-        vectorizer = NumberVectorizer(self.bins, min_f=min_f)
+        vectorizer = BinVectorizer(self.bins, min_f=min_f, dtype=self.dtype)
         vectorizer = vectorizer.fit(timestamps, n_total=n_total)
         if vectorizer is None and not has_invalid_feature:
             return None
@@ -161,7 +165,7 @@ class TimestampVectorizer(BaseVectorizer):
 
         n_values = len(invalids) + len(valids)
         X = sp.lil_matrix(
-            (n_values, len(self.feature_names_)), dtype=bool
+            (n_values, len(self.feature_names_)), dtype=self.dtype
         )
         if self._has_invalid_feature:
             if invalids:
