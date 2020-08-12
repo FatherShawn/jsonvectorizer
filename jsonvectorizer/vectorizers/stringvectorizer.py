@@ -69,7 +69,7 @@ class StringVectorizer(BaseVectorizer):
             params['min_df'] = params['min_df']
 
         vectorizer = feature_extraction.text.CountVectorizer(
-            dtype=self.type, **params
+            dtype=self.dtype, **params
         )
         try:
             vectorizer.fit(values)
